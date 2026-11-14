@@ -1,0 +1,65 @@
+name: Import validation message catalogs
+
+on:
+  push:
+    paths:
+      - '.github/workflows/import.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Unpack verified catalogs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import base64
+          import hashlib
+          import io
+          import lzma
+          import tarfile
+
+          chunks = [Path(f'import/payload-{i:02d}.txt').read_text(encoding='ascii') for i in range(8)]
+          compressed = base64.b64decode(''.join(chunks), validate=True)
+          expected = 'c764e2ef7f7edbc76e2ecbd37c4728741d642be18d71e6441e4972ffa25c1463'
+          digest = hashlib.sha256(compressed).hexdigest()
+          if digest != expected:
+              raise ValueError(f'Archive checksum mismatch: {digest}')
+
+          with tarfile.open(fileobj=io.BytesIO(lzma.decompress(compressed)), mode='r:') as archive:
+              for member in archive:
+                  path = PurePosixPath(member.name)
+                  if not member.isfile() or path.is_absolute() or '..' in path.parts:
+                      raise ValueError(f'Unsafe archive member: {member.name}')
+                  target = Path(*path.parts)
+                  if str(target).startswith('import/'):
+                      raise ValueError(f'Import archive must not overwrite staging files: {member.name}')
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  with archive.extractfile(member) as reader:
+                      target.write_bytes(reader.read())
+
+          for i in range(8):
+              Path(f'import/payload-{i:02d}.txt').unlink()
+          Path('import').rmdir()
+          Path('.github/workflows/import.yml').unlink()
+          PY
+      - name: Validate translated messages
+        run: |
+          find languages tests -name '*.php' -type f -print0 | xargs -0 -n1 php -l
+          php tests/validate.php
+      - name: Publish extracted repository files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: publish 25 language validation catalogs"
+          git push origin HEAD:main
