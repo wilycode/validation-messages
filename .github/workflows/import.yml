@@ -41,6 +41,8 @@ jobs:
                   if not member.isfile() or path.is_absolute() or '..' in path.parts:
                       raise ValueError(f'Unsafe archive member: {member.name}')
                   target = Path(*path.parts)
+                  if str(target) == '.github/workflows/validate.yml':
+                      continue  # Workflow files are installed separately with elevated permissions.
                   if str(target).startswith('import/'):
                       raise ValueError(f'Import archive must not overwrite staging files: {member.name}')
                   target.parent.mkdir(parents=True, exist_ok=True)
@@ -50,7 +52,6 @@ jobs:
           for i in range(8):
               Path(f'import/payload-{i:02d}.txt').unlink()
           Path('import').rmdir()
-          Path('.github/workflows/import.yml').unlink()
           PY
       - name: Validate translated messages
         run: |
