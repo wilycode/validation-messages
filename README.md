@@ -97,15 +97,15 @@ use WilyCode\TranslationArray\ArrayTranslator;
 
 $translator = new ArrayTranslator(
     directory: __DIR__ . '/languages',
-    language: new Pl(),
-    fallbackLanguage: new En(),
+    language: new En(),
+    fallbackLanguage: new Pl(),
 );
 
 echo $translator->translate('validation', 'not_empty.required');
-// To pole jest wymagane.
+// This field is required.
 
 echo $translator->translate('validation', 'string_length.too_short', ['min' => 5]);
-// Wpisz co najmniej 5 znaków.
+// Enter at least 5 characters.
 ```
 
 With [wilycode/template-translation](https://github.com/wilycode/template-translation):
